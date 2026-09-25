@@ -1,65 +1,81 @@
 import os
-import io
-from PIL import Image
+import asyncio
+from http.server import HTTPServer, BaseHTTPRequestHandler
+import threading
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
-from google import genai
+import google.generativeai as genai
 
-# Vai buscar as chaves das Variáveis de Ambiente por segurança
+# Configuração dos Tokens através das Variáveis de Ambiente
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
-ai_client = genai.Client(api_key=GEMINI_API_KEY)
+# Servidor HTTP simples para o Render (Health Check)
+class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot do Telegram ativo!")
+
+def run_health_check_server():
+    port = int(os.environ.get("PORT", 8080))
+    server = HTTPServer(('0.0.0.0', port), SimpleHTTPRequestHandler)
+    server.serve_forever()
+
+# Inicialização do Gemini AI
+genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel('gemini-1.5-flash')
 
 PROMPT_ANALISE = """
-Atua como um especialista em análise técnica de mercados financeiros.
-Analisa a imagem deste gráfico e fornece um relatório direto e estruturado:
-
-1. 📈 **Tendência Principal:** (Alta, Baixa ou Lateralização)
-2. 🎯 **Níveis Chave:** Identifica Suportes e Resistências visíveis.
-3. 🕯️ **Padrões de Candles / Figuras:** (Ex: Martelo, Engolfo, Topo Duplo, Mastro e Bandeira, etc.)
-4. 🚀 **Cenário Provável:** Qual a direção mais provável para os próximos candles.
-5. ⚠️ **Gestão de Risco:** Zona sugerida para Invalidação / Stop Loss.
-
-Responde em português, de forma clara e formatada com emojis.
+Atua como um analista técnico sénior de mercados financeiros.
+Analisa este gráfico com detalhe e fornece uma resposta estruturada:
+1. Tendência Principal (Alta, Baixa ou Lateral)
+2. Níveis Críticos (Suportes e Resistências)
+3. Padrões de Velas ou Figuras Geométricas detetadas
+4. Sugestão Operacional Resumida (Pontos de Atenção/Risco)
+Seja claro, objetivo e profissional.
 """
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "👋 **Bot de Análise de Gráficos Ativo!**\nEnvia uma foto ou print de qualquer gráfico que eu analiso para ti."
-    )
+    await update.message.reply_text("Olá! Envia-me um print de um gráfico financeiro e farei a análise técnica para ti.")
 
-async def analisar_foto(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    status_msg = await update.message.reply_text("🔍 *A analisar o gráfico... Aguarde uns segundos.*", parse_mode="Markdown")
+async def analisar_grafico(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    mensagem_aguarde = await update.message.reply_text("A analisar o gráfico, aguarda um momento...")
     
     try:
+        # Transferir a foto enviada pelo utilizador
         photo_file = await update.message.photo[-1].get_file()
-        photo_bytes = await photo_file.download_as_bytearray()
+        file_bytes = await photo_file.download_as_bytearray()
         
-        image = Image.open(io.BytesIO(photo_bytes))
+        image_part = {
+            "mime_type": "image/jpeg",
+            "data": bytes(file_bytes)
+        }
         
-        # Usa o modelo Gemini 2.5 Flash para análise de imagem rápida
-        response = ai_client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=[image, PROMPT_ANALISE]
-        )
+        # Enviar imagem para a API do Gemini
+        response = model.generate_content([PROMPT_ANALISE, image_part])
         
-        await status_msg.edit_text(response.text, parse_mode="Markdown")
+        # Enviar resposta de volta para o Telegram
+        await mensagem_aguarde.edit_text(response.text)
         
     except Exception as e:
-        await status_msg.edit_text(f"❌ Erro ao analisar a imagem: {str(e)}")
+        await mensagem_aguarde.edit_text(f"Ocorreu um erro ao analisar a imagem: {str(e)}")
 
 def main():
     if not TELEGRAM_TOKEN or not GEMINI_API_KEY:
-        print("ERRO: TELEGRAM_TOKEN ou GEMINI_API_KEY não configurados!")
+        print("ERRO: As variáveis TELEGRAM_TOKEN e GEMINI_API_KEY precisam estar configuradas!")
         return
 
+    # Iniciar servidor de Health Check numa thread separada
+    threading.Thread(target=run_health_check_server, daemon=True).start()
+
+    # Iniciar Bot do Telegram
     app = Application.builder().token(TELEGRAM_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.PHOTO, analisar_foto))
+    app.add_handler(MessageHandler(filters.PHOTO, analisar_grafico))
     
-    print("Bot rodando 24/7...")
+    print("Bot a rodar 24/7...")
     app.run_polling()
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
