@@ -24,7 +24,7 @@ def run_health_check_server():
 
 # Inicialização do Gemini AI
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-1.5-flash')
+model = genai.GenerativeModel('gemini-1.5-flash-latest')
 
 PROMPT_ANALISE = """
 Atua como um analista técnico sénior de mercados financeiros.
