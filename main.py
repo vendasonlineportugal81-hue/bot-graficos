@@ -22,12 +22,37 @@ def run_health_check_server():
     server = HTTPServer(('0.0.0.0', port), SimpleHTTPRequestHandler)
     server.serve_forever()
 
-# Inicialização do Gemini AI com o modelo correto e gratuito
+# Inicialização da API do Gemini
 genai.configure(api_key=GEMINI_API_KEY)
-MODEL_NAME = 'gemini-2.0-flash'  # Modelo rápido e com cotas gratuitas mais amplas
-model = genai.GenerativeModel(MODEL_NAME)
 
-# Prompt objetivo ajustado para o Fuso Horário de Lisboa
+# Função para encontrar automaticamente o modelo disponível sem erros 404 ou de cota
+def obter_modelo_ativo():
+    modelos_prioritarios = [
+        'gemini-2.5-flash',
+        'gemini-2.0-flash',
+        'gemini-2.0-flash-exp',
+        'gemini-1.5-flash-latest'
+    ]
+    
+    # Tenta primeiro os modelos conhecidos
+    for m in modelos_prioritarios:
+        try:
+            return genai.GenerativeModel(m)
+        except Exception:
+            continue
+            
+    # Se nenhum dos prioritários funcionar, descobre dinamicamente da API do Google
+    try:
+        for m in genai.list_models():
+            if 'generateContent' in m.supported_generation_methods and 'flash' in m.name:
+                nome_limpo = m.name.replace('models/', '')
+                return genai.GenerativeModel(nome_limpo)
+    except Exception:
+        pass
+        
+    return genai.GenerativeModel('gemini-2.5-flash')
+
+# Prompt objetivo ajustado para o Fuso Horário de Lisboa com 3 indicadores
 PROMPT_ANALISE = """
 Atua como analista técnico rápido. Analisa a imagem do gráfico aplicando 3 indicadores à tua escolha (ex: RSI, Média Móvel, Bandas de Bollinger, MACD ou Price Action/Suporte e Resistência).
 
@@ -63,17 +88,13 @@ async def analisar_grafico(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "data": bytes(file_bytes)
         }
         
+        # Obtém dinamicamente o modelo que está a funcionar na tua conta
+        model = obter_modelo_ativo()
         response = model.generate_content([PROMPT_ANALISE, image_part])
         await mensagem_aguarde.edit_text(response.text)
         
     except Exception as e:
-        # Se falhar no modelo 2.0, tenta automaticamente o 1.5-flash
-        try:
-            fallback_model = genai.GenerativeModel('gemini-1.5-flash')
-            response = fallback_model.generate_content([PROMPT_ANALISE, image_part])
-            await mensagem_aguarde.edit_text(response.text)
-        except Exception as err:
-            await mensagem_aguarde.edit_text(f"Erro ao analisar: {str(err)}")
+        await mensagem_aguarde.edit_text(f"Erro ao analisar: {str(e)}")
 
 def main():
     if not TELEGRAM_TOKEN or not GEMINI_API_KEY:
@@ -91,4 +112,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+
 
