@@ -1,4 +1,3 @@
-
 import os
 import asyncio
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -23,28 +22,38 @@ def run_health_check_server():
     server = HTTPServer(('0.0.0.0', port), SimpleHTTPRequestHandler)
     server.serve_forever()
 
-# Inicialização do Gemini AI com o modelo atual
+# Inicialização do Gemini AI
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel('gemini-3.8-flash')
 
+# Prompt objetivo ajustado para o Fuso Horário de Lisboa
 PROMPT_ANALISE = """
-Atua como um analista técnico sénior de mercados financeiros.
-Analisa este gráfico com detalhe e fornece uma resposta estruturada:
-1. Tendência Principal (Alta, Baixa ou Lateral)
-2. Níveis Críticos (Suportes e Resistências)
-3. Padrões de Velas ou Figuras Geométricas detetadas
-4. Sugestão Operacional Resumida (Pontos de Atenção/Risco)
-Seja claro, objetivo e profissional.
+Atua como analista técnico rápido. Analisa a imagem do gráfico aplicando 3 indicadores à tua escolha (ex: RSI, Média Móvel, Bandas de Bollinger, MACD ou Price Action/Suporte e Resistência).
+
+Responde EXCLUSIVAMENTE no formato abaixo, de forma resumida e sem introduções:
+
+📉 **INDICADORES USADOS NA ANÁLISE:**
+1. [Nome do Indicador 1]: [Sinal curto - ex: Sobrevendido / Alta]
+2. [Nome do Indicador 2]: [Sinal curto - ex: Cruzamento de Média / Alta]
+3. [Nome do Indicador 3]: [Sinal curto - ex: Rejeição no Suporte / Alta]
+
+📊 **PROJEÇÃO PRÓXIMAS 3 VELAS:**
+• Vela 1: [CALL ou PUT] | Probabilidade: [X]%
+• Vela 2: [CALL ou PUT] | Probabilidade: [X]%
+• Vela 3: [CALL ou PUT] | Probabilidade: [X]%
+
+⏰ **ENTRADA E FUSO HORÁRIO:**
+• Fuso Horário: Lisboa (WET/WEST)
+• Ponto de Entrada: [Ex: Entrar no segundo 00:00 na virada da próxima vela]
 """
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Olá! Envia-me um print de um gráfico financeiro e farei a análise técnica para ti.")
+    await update.message.reply_text("Olá! Envia um print do gráfico para receberes a análise rápida com 3 indicadores (Fuso: Lisboa).")
 
 async def analisar_grafico(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    mensagem_aguarde = await update.message.reply_text("A analisar o gráfico, aguarda um momento...")
+    mensagem_aguarde = await update.message.reply_text("A analisar indicadores e velas...")
     
     try:
-        # Transferir a foto enviada pelo utilizador
         photo_file = await update.message.photo[-1].get_file()
         file_bytes = await photo_file.download_as_bytearray()
         
@@ -53,24 +62,19 @@ async def analisar_grafico(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "data": bytes(file_bytes)
         }
         
-        # Enviar imagem para a API do Gemini
         response = model.generate_content([PROMPT_ANALISE, image_part])
-        
-        # Enviar resposta de volta para o Telegram
         await mensagem_aguarde.edit_text(response.text)
         
     except Exception as e:
-        await mensagem_aguarde.edit_text(f"Ocorreu um erro ao analisar a imagem: {str(e)}")
+        await mensagem_aguarde.edit_text(f"Erro ao analisar: {str(e)}")
 
 def main():
     if not TELEGRAM_TOKEN or not GEMINI_API_KEY:
         print("ERRO: As variáveis TELEGRAM_TOKEN e GEMINI_API_KEY precisam estar configuradas!")
         return
 
-    # Iniciar servidor de Health Check numa thread separada
     threading.Thread(target=run_health_check_server, daemon=True).start()
 
-    # Iniciar Bot do Telegram
     app = Application.builder().token(TELEGRAM_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.PHOTO, analisar_grafico))
@@ -80,3 +84,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
