@@ -22,9 +22,10 @@ def run_health_check_server():
     server = HTTPServer(('0.0.0.0', port), SimpleHTTPRequestHandler)
     server.serve_forever()
 
-# Inicialização do Gemini AI
+# Inicialização do Gemini AI com o modelo correto e gratuito
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-3.8-flash')
+MODEL_NAME = 'gemini-2.0-flash'  # Modelo rápido e com cotas gratuitas mais amplas
+model = genai.GenerativeModel(MODEL_NAME)
 
 # Prompt objetivo ajustado para o Fuso Horário de Lisboa
 PROMPT_ANALISE = """
@@ -66,7 +67,13 @@ async def analisar_grafico(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await mensagem_aguarde.edit_text(response.text)
         
     except Exception as e:
-        await mensagem_aguarde.edit_text(f"Erro ao analisar: {str(e)}")
+        # Se falhar no modelo 2.0, tenta automaticamente o 1.5-flash
+        try:
+            fallback_model = genai.GenerativeModel('gemini-1.5-flash')
+            response = fallback_model.generate_content([PROMPT_ANALISE, image_part])
+            await mensagem_aguarde.edit_text(response.text)
+        except Exception as err:
+            await mensagem_aguarde.edit_text(f"Erro ao analisar: {str(err)}")
 
 def main():
     if not TELEGRAM_TOKEN or not GEMINI_API_KEY:
