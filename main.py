@@ -23,9 +23,9 @@ def run_health_check_server():
     server = HTTPServer(('0.0.0.0', port), SimpleHTTPRequestHandler)
     server.serve_forever()
 
-# Inicialização do Gemini AI
+# Inicialização do Gemini AI com o modelo atual
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-2.5-flash')
+model = genai.GenerativeModel('gemini-3.8-flash')
 
 PROMPT_ANALISE = """
 Atua como um analista técnico sénior de mercados financeiros.
