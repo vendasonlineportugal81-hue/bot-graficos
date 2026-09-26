@@ -8,12 +8,9 @@ import threading
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
-# Captura os tokens do Render
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-# Pega a chave da variável GEMINI_API_KEY ou GROQ_API_KEY
 API_KEY = os.environ.get("GEMINI_API_KEY") or os.environ.get("GROQ_API_KEY")
 
-# Servidor HTTP para o Render não dar timeout
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -46,8 +43,11 @@ Responde EXCLUSIVAMENTE no formato abaixo, de forma resumida e sem introduções
 """
 
 def analisar_imagem_directo(image_base64):
-    # Requisição direta via REST API sem depender de SDKs
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY}"
+    modelos = [
+        f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={API_KEY}",
+        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={API_KEY}",
+        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent?key={API_KEY}"
+    ]
     
     payload = {
         "contents": [{
@@ -64,15 +64,21 @@ def analisar_imagem_directo(image_base64):
     }
     
     data = json.dumps(payload).encode('utf-8')
-    req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'})
+    headers = {'Content-Type': 'application/json'}
     
-    try:
-        with urllib.request.urlopen(req) as response:
-            res_data = json.loads(response.read().decode('utf-8'))
-            return res_data['candidates'][0]['content']['parts'][0]['text']
-    except urllib.error.HTTPError as e:
-        error_body = e.read().decode('utf-8')
-        return f"Erro na API ({e.code}): {error_body}"
+    ultimo_erro = ""
+    for url in modelos:
+        try:
+            req = urllib.request.Request(url, data=data, headers=headers)
+            with urllib.request.urlopen(req) as response:
+                res_data = json.loads(response.read().decode('utf-8'))
+                return res_data['candidates'][0]['content']['parts'][0]['text']
+        except urllib.error.HTTPError as e:
+            error_body = e.read().decode('utf-8')
+            ultimo_erro = f"Erro na API ({e.code}): {error_body}"
+            continue
+            
+    return ultimo_erro
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Olá! Envia um print do gráfico para receberes a análise rápida com 3 indicadores (Fuso: Lisboa).")
@@ -94,7 +100,7 @@ async def analisar_grafico(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def main():
     if not TELEGRAM_TOKEN or not API_KEY:
-        print("ERRO: TELEGRAM_TOKEN e API_KEY/GROQ_API_KEY precisam estar configurados!")
+        print("ERRO: Variáveis de ambiente ausentes!")
         return
 
     threading.Thread(target=run_health_check_server, daemon=True).start()
@@ -103,7 +109,7 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.PHOTO, analisar_grafico))
     
-    print("Bot operacional sem SDKs de terceiros...")
+    print("Bot a rodar...")
     app.run_polling()
 
 if __name__ == '__main__':
