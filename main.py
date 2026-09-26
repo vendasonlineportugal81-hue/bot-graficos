@@ -1,3 +1,4 @@
+
 import os
 import json
 import base64
@@ -43,10 +44,10 @@ Responde EXCLUSIVAMENTE no formato abaixo, de forma resumida e sem introduções
 """
 
 def analisar_imagem_directo(image_base64):
+    # Endpoints REST atualizados e diretos da API Gemini
     modelos = [
-        f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={API_KEY}",
-        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={API_KEY}",
-        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent?key={API_KEY}"
+        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY}",
+        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key={API_KEY}"
     ]
     
     payload = {
