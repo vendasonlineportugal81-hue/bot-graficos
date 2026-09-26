@@ -1,5 +1,4 @@
 
-
 import os
 import base64
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -55,16 +54,14 @@ async def analisar_grafico(update: Update, context: ContextTypes.DEFAULT_TYPE):
     mensagem_aguarde = await update.message.reply_text("A analisar indicadores e velas...")
     
     try:
-        # Descarrega a imagem enviada
         photo_file = await update.message.photo[-1].get_file()
         file_bytes = await photo_file.download_as_bytearray()
         
-        # Converte para Base64
         base64_image = base64.b64encode(file_bytes).decode('utf-8')
         
-        # Envia para o modelo Llama 3.2 Vision na Groq
+        # Modelo atualizado da Groq para Visão
         completion = groq_client.chat.completions.create(
-            model="llama-3.2-11b-vision-preview",
+            model="llama-3.2-90b-vision-preview",
             messages=[
                 {
                     "role": "user",
