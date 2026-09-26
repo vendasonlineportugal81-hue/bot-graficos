@@ -59,7 +59,7 @@ async def analisar_grafico(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         base64_image = base64.b64encode(file_bytes).decode('utf-8')
         
-        # Modelo atualizado da Groq para Visão
+        # Chamada ao modelo de visão ativo da Groq
         completion = groq_client.chat.completions.create(
             model="llama-3.2-90b-vision-preview",
             messages=[
@@ -101,4 +101,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
