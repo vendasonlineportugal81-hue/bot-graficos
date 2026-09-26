@@ -1,4 +1,3 @@
-
 import os
 import base64
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -59,9 +58,9 @@ async def analisar_grafico(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         base64_image = base64.b64encode(file_bytes).decode('utf-8')
         
-        # Chamada ao modelo de visão ativo da Groq
+        # Modelo ativo de visão na Groq
         completion = groq_client.chat.completions.create(
-            model="llama-3.2-90b-vision-preview",
+            model="qwen/qwen3.8-27b",
             messages=[
                 {
                     "role": "user",
